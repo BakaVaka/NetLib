@@ -26,7 +26,7 @@
         private static async Task EchoHandler(ITransportConnection connection, CancellationToken stopToken)
         {
             byte[] buffer = new byte[1024];
-            Console.WriteLine($"Start handel connection form {connection.RemoteEndPoint}");
+            Console.WriteLine($"Start handle connection form {connection.RemoteEndPoint}");
             while (!stopToken.IsCancellationRequested)
             {
                 var bytes = await connection.Receve(buffer);

@@ -89,7 +89,7 @@
             {
                 case IPEndPoint ip:
                     {
-                        Socket socket = new Socket(ip.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+                        Socket socket = new(ip.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
                         if(ip.AddressFamily == AddressFamily.InterNetworkV6)
                         {
                             socket.DualMode = _useDualMode;
