@@ -1,49 +1,105 @@
 ﻿using System;
 using System.Net;
 using System.Net.Sockets;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace BakaVaka.TcpServerLib
 {
-    public class TcpSocketConnection : ITransportConnection
+    public class TcpSocketConnection<TMessage, TProtocl, TContext> : IConnection<TMessage, TProtocl, TContext>
+        where TProtocl : IProtocol<TMessage, TContext>, new()
+        where TContext : IConnectionContext, new()
     {
-        private readonly Socket _socket;
-        private readonly TcpServer _server;
+        private CancellationTokenSource _cancellationTokenSource = new();
+        private bool _closed;
+        private EndPoint _localEndPoint;
+        private EndPoint _remoteEndPoint;
 
-        public TcpSocketConnection(Socket socket, TcpServer server)
+        private readonly NetworkStream _networkStream;
+        private TProtocl _protocl = new();
+        private TContext _context = new();
+
+        public TcpSocketConnection(Socket socket)
         {
-            if (socket is null)
+            _localEndPoint = socket.LocalEndPoint;
+            _remoteEndPoint = socket.RemoteEndPoint;
+            _networkStream = new NetworkStream(socket, true);
+            _context.Bind(this);
+        }
+
+        public TContext Contex => _context;
+
+        public EndPoint LocalEndPoint => _localEndPoint;
+
+        public EndPoint RemoteEndPoint => _remoteEndPoint;
+
+        public DateTime LastRecievedDateTime { get; private set; }
+
+        public DateTime LastSentDateTime { get; private set; }
+
+        public string ID { get; } = Guid.NewGuid().ToString();
+
+
+        public async Task<TMessage> Receive(CancellationToken cancellationToken)
+        {
+            ThrowIfDisposed();
+            var message = await _protocl.Decode(_networkStream, Contex);
+            LastRecievedDateTime = DateTime.Now;
+            return message;
+        }
+
+        public async Task Send<T>(T message)
+        {
+            ThrowIfDisposed();
+            if(message is TMessage protocolMessage)
             {
-                throw new ArgumentNullException(nameof(socket));
+                var data = _protocl.Encode(protocolMessage, Contex);
+                await _networkStream.WriteAsync(data, _cancellationTokenSource.Token);
+                LastSentDateTime = DateTime.Now;
             }
-            _socket = socket;
-            _server = server;
-            LocalEndPoint = _socket.LocalEndPoint;
-            RemoteEndPoint = _socket.RemoteEndPoint;
-            _server.Stopped += OnServerStopped;
         }
 
-        public EndPoint LocalEndPoint { get; }
 
-        public EndPoint RemoteEndPoint { get; }
+        private bool _disposed;
 
-        public void Dispose()
+        public event EventHandler Closed;
+
+        private void ThrowIfDisposed()
         {
-            _socket?.Dispose();
+            if(_disposed)
+            {
+                throw new ObjectDisposedException($"Tcp connection {ID}");
+            }
+        }
+        ~TcpSocketConnection() => Dispose(false);
+        public void Dispose() => Dispose(true);
+
+        private void Dispose(bool isDispose)
+        {
+            if(!_disposed)
+            {
+                _disposed = true;
+                //TODO освобождать ресурсы
+                _cancellationTokenSource.Dispose();
+                _networkStream.Dispose();
+                _context.Dispose();
+                if(isDispose)
+                {
+                    GC.SuppressFinalize(this);
+                }
+            }
         }
 
-        public ValueTask<int> Receve(Memory<byte> buffer)
+        public void Close()
         {
-            return _socket.ReceiveAsync(buffer, SocketFlags.None);
-        }
-        public ValueTask<int> Send(ReadOnlyMemory<byte> message)
-        {
-            return _socket.SendAsync(message, SocketFlags.None);
-        }
-        private void OnServerStopped()
-        {
-            _server.Stopped -= OnServerStopped;
-            Dispose();
+            if(!_closed)
+            {
+                _closed = true;
+
+                _cancellationTokenSource.Cancel();
+                _networkStream.Close();
+
+            }
         }
     }
 }

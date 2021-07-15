@@ -6,67 +6,57 @@
     using System.Threading;
     using System.Threading.Tasks;
 
-    public class TcpServer
+    public class TcpServer<TMessage, TProtocol, TContext>
+        where TProtocol : IProtocol<TMessage, TContext>
+        where TContext : IConnectionContext, new()
     {
-        public event Action Stopped;
-        public event Action Started;
-        private readonly IPEndPoint _endPoint;
-        private readonly object _startStopLocker = new();
-        private CancellationTokenSource _serverStopToketSource;
+        private IPEndPoint _endPoint;
+        private readonly Func<Socket, IConnection<TMessage, TProtocol, TContext>> _connectionFactory;
+        private readonly Func<TContext, TMessage, Task> _messageHandler;
         private SemaphoreSlim _connectionLimiter;
-        private Func<ITransportConnection, CancellationToken, Task> _connetionHandler;
-        private TcpSocketAcceptor _acceptor;
+        private CancellationTokenSource _serverStopToketSource = new();
+        private Socket _acceptor;
 
         public TcpServer(
             IPEndPoint endPoint,
-            Func<ITransportConnection, CancellationToken, Task> connectionHandler,
+            Func<Socket, IConnection<TMessage, TProtocol, TContext>> connectionFactory,
+            Func<TContext, TMessage, Task> messageHandler,
             int maxConnection)
         {
             _endPoint = endPoint;
+            _connectionFactory = connectionFactory;
+            _messageHandler = messageHandler;
             _connectionLimiter = new SemaphoreSlim(maxConnection, maxConnection);
-            _connetionHandler = connectionHandler;
-            _acceptor = new TcpSocketAcceptor(
-                socket =>
-                {
-                    return new TcpSocketConnection(socket, this);
-                },
-                _endPoint
-                );
         }
 
-        public void Start()
+        public Task Run()
         {
-            lock(_startStopLocker)
-            {
-                if(_acceptor.IsBinded)
-                {
-                    return;
-                }
-                _serverStopToketSource = new CancellationTokenSource();
-                _acceptor.Bind();
-            }
-            RunAcceptLoop();
-            Started?.Invoke();
-        }
-        public void Stop()
-        {
-            lock(_startStopLocker)
-            {
-                _acceptor.Unbind();
-                _serverStopToketSource.Cancel();
-                Stopped?.Invoke();
-            }
+            CreateAcceptor();
+            return Task.Run(RunAcceptLoop, _serverStopToketSource.Token);
         }
 
-        private async void RunAcceptLoop()
+        private void CreateAcceptor()
+        {
+            _acceptor = new(SocketType.Stream, ProtocolType.Tcp);
+            _acceptor.Bind(_endPoint);
+            _acceptor.Listen();
+        }
+
+        private async Task RunAcceptLoop()
         {
             try
             {
                 while(!_serverStopToketSource.IsCancellationRequested)
                 {
                     await _connectionLimiter.WaitAsync();
-                    var clientConnection = await _acceptor.AcceptConnection(_serverStopToketSource.Token);
-                    ProcessConnection(clientConnection);
+                    var clientSocket = await Task.Run(_acceptor.AcceptAsync,_serverStopToketSource.Token);
+                    var connection = _connectionFactory(clientSocket);
+                    connection.Closed += (_, _) =>
+                    {
+                        Console.WriteLine("Connection closed");
+                        _connectionLimiter.Release();
+                    };
+                    ProcessConnection(connection);
                 }
             }
             catch(SocketException ex) when (ex.SocketErrorCode != SocketError.Success) { }
@@ -74,18 +64,17 @@
             catch (OperationCanceledException) { }
         }
 
-        private async void ProcessConnection(ITransportConnection clientConnection)
+        private async void ProcessConnection(IConnection<TMessage, TProtocol, TContext> connection)
         {
             try
             {
-                await _connetionHandler(clientConnection, _serverStopToketSource.Token);
+                while(true)
+                {
+                    var message = await connection.Receive();
+                    await _messageHandler(connection.Contex, message);
+                }
             }
-            catch (Exception) { }
-            finally 
-            { 
-                _connectionLimiter.Release(); 
-                clientConnection.Dispose(); 
-            }
+            catch (Exception) { connection.Close(); }
         }
     }
 }
