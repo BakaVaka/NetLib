@@ -1,31 +1,66 @@
-﻿using System;
-using System.Net;
-using System.Net.Sockets;
-using System.Threading;
-using System.Threading.Tasks;
-
-namespace BakaVaka.TcpServerLib
+﻿namespace BakaVaka.TcpServerLib
 {
-    public class TcpSocketConnection<TMessage, TProtocl, TContext> : IConnection<TMessage, TProtocl, TContext>
-        where TProtocl : IProtocol<TMessage, TContext>, new()
+    using System;
+    using System.Net;
+    using System.Net.Sockets;
+    using System.Threading;
+    using System.Threading.Tasks;
+
+    public class TcpSocketConnection<TMessage, TProtocol, TContext> : 
+        IConnection<TMessage, TProtocol, TContext>
+        where TProtocol : IProtocol<TMessage, TContext>, new()
         where TContext : IConnectionContext, new()
     {
+
+        public event EventHandler Closed;
+
+        private Func<TMessage, Task> _messageCallback;
+
         private CancellationTokenSource _cancellationTokenSource = new();
         private bool _closed;
         private EndPoint _localEndPoint;
         private EndPoint _remoteEndPoint;
 
-        private readonly NetworkStream _networkStream;
-        private TProtocl _protocl = new();
+        private NetworkStream _networkStream;
+        private TProtocol _protocl = new();
         private TContext _context = new();
 
-        public TcpSocketConnection(Socket socket)
+        private readonly object _bindLocker = new();
+        private bool _binded;
+        private Task _connectionRunTask;
+
+        public void BindSocket(Socket socket)
         {
-            _localEndPoint = socket.LocalEndPoint;
-            _remoteEndPoint = socket.RemoteEndPoint;
-            _networkStream = new NetworkStream(socket, true);
-            _context.Bind(this);
+            lock(_bindLocker)
+            {
+                if(_binded)
+                {
+                    throw new InvalidOperationException("Connection already binded to socket");
+                }
+                _localEndPoint = socket.LocalEndPoint;
+                _remoteEndPoint = socket.RemoteEndPoint;
+                _networkStream = new NetworkStream(socket, true);
+                _context.Bind(this);
+            }
+            _connectionRunTask = RunConnection();
         }
+
+        private async Task RunConnection()
+        {
+            try
+            {
+                while(!_cancellationTokenSource.IsCancellationRequested)
+                {
+
+                    var message = await Receive(_cancellationTokenSource.Token);
+                    await _messageCallback.Invoke(message);
+                }
+            }
+            catch(Exception) { }
+            Close();
+        }
+
+        public virtual void OnIdle(){}
 
         public TContext Contex => _context;
 
@@ -33,42 +68,39 @@ namespace BakaVaka.TcpServerLib
 
         public EndPoint RemoteEndPoint => _remoteEndPoint;
 
-        public DateTime LastRecievedDateTime { get; private set; }
+        public DateTime LastAcceptedMessageDateTime { get; private set; }
 
-        public DateTime LastSentDateTime { get; private set; }
+        public DateTime LastSentMessageDateTime { get; private set; }
+        public Guid Id { get; } = Guid.NewGuid();
 
-        public string ID { get; } = Guid.NewGuid().ToString();
 
-
-        public async Task<TMessage> Receive(CancellationToken cancellationToken)
+        private async Task<TMessage> Receive(CancellationToken cancellationToken)
         {
             ThrowIfDisposed();
-            var message = await _protocl.Decode(_networkStream, Contex);
-            LastRecievedDateTime = DateTime.Now;
+            var message = await _protocl.Decode(_networkStream, Contex, cancellationToken);
+            LastAcceptedMessageDateTime = DateTime.Now;
             return message;
         }
 
-        public async Task Send<T>(T message)
+        public virtual async Task Send<T>(T message)
         {
             ThrowIfDisposed();
             if(message is TMessage protocolMessage)
             {
                 var data = _protocl.Encode(protocolMessage, Contex);
                 await _networkStream.WriteAsync(data, _cancellationTokenSource.Token);
-                LastSentDateTime = DateTime.Now;
+                LastSentMessageDateTime = DateTime.Now;
             }
         }
 
 
         private bool _disposed;
 
-        public event EventHandler Closed;
-
         private void ThrowIfDisposed()
         {
             if(_disposed)
             {
-                throw new ObjectDisposedException($"Tcp connection {ID}");
+                throw new ObjectDisposedException($"Tcp connection {Id}");
             }
         }
         ~TcpSocketConnection() => Dispose(false);
@@ -79,7 +111,6 @@ namespace BakaVaka.TcpServerLib
             if(!_disposed)
             {
                 _disposed = true;
-                //TODO освобождать ресурсы
                 _cancellationTokenSource.Dispose();
                 _networkStream.Dispose();
                 _context.Dispose();
@@ -95,11 +126,15 @@ namespace BakaVaka.TcpServerLib
             if(!_closed)
             {
                 _closed = true;
-
                 _cancellationTokenSource.Cancel();
                 _networkStream.Close();
-
+                Closed?.Invoke(this, EventArgs.Empty);
             }
+        }
+
+        public void OnMessage(Func<TMessage, Task> onMessageCallback)
+        {
+            _messageCallback = onMessageCallback;
         }
     }
 }

@@ -1,90 +1,69 @@
 ﻿namespace EchoServer
 {
     using BakaVaka.TcpServerLib;
+    using Microsoft.Extensions.Logging;
+    using Shared;
     using System;
-    using System.IO;
     using System.Net;
-    using System.Net.Sockets;
     using System.Threading.Tasks;
 
     public class MyEchoServer : TcpServer<RawMessage, EchoProtocol, EmptyContext>
     {
-        public MyEchoServer(IPEndPoint endPoint, 
-            Func<Socket, IConnection<RawMessage, EchoProtocol, EmptyContext>> connectionFactory, 
-            Func<EmptyContext, RawMessage, Task> messageHandler, 
-            int maxConnection) : base(endPoint, connectionFactory, messageHandler, maxConnection)
+        public MyEchoServer(
+            ServerSettings settings, 
+            ILogger<MyEchoServer> logger)
+            : base(settings, 
+                  logger,
+                  new EmptyDispatcher(),
+                  () => new TcpSocketConnection<RawMessage, EchoProtocol, EmptyContext>())
         {
         }
+
     }
 
-    public class EchoProtocol : IProtocol<RawMessage, EmptyContext>
+    public class EmptyDispatcher : MessageDispatcherBase<RawMessage, EmptyContext>
     {
-        public async Task<RawMessage> Decode(Stream inputStream, EmptyContext context)
+        protected override Task Dispatch<TProtocol>(
+            RawMessage message, 
+            IConnection<RawMessage, TProtocol, EmptyContext> connection, 
+            EmptyContext contex)
         {
-            var byteBuffer = new byte[1024];
-            var len =  await inputStream.ReadAsync(byteBuffer);
-            return new RawMessage
-            {
-                Buffer = byteBuffer[..len]
-            };
+            Console.WriteLine("Message accepted");
+            return connection.Send(message);
         }
-
-        public byte[] Encode(RawMessage message, EmptyContext clientContext)
-        {
-            return message.Buffer ?? Array.Empty<byte>();
-        }
-    }
-
-    public class EmptyContext : IConnectionContext
-    {
-        private object _owner;
-        public object Owner => _owner;
-
-        public void Bind(object connection)
-        {
-            if(_owner is null)
-            {
-                _owner = connection;
-                return;
-            }
-            throw new InvalidOperationException("Already binded");
-        }
-
-        public void Dispose(){}
-
-        public T Get<T>() { throw new NotImplementedException(); }
-    }
-
-    public class RawMessage
-    {
-        public byte[] Buffer { get; set; }
-    }
+    }   
 
     class Program
     {
-        static async Task Main(string[] args)
+        static async Task Main()
         {
 
-            MyEchoServer server = new MyEchoServer(
-                new IPEndPoint(0, 8080),
-                (s) => new TcpSocketConnection<RawMessage, EchoProtocol, EmptyContext>(s),
-                MyMessageHandler,
-                1000000);
-            await server.Run();
+            ILogger<MyEchoServer> logger = new ConsoleLogger<MyEchoServer>();
+
+            var echoServer = new MyEchoServer
+                (new ServerSettings
+                (new IPEndPoint(0, 8080), 1000000,
+                    TimeSpan.FromSeconds(10),
+                    TimeSpan.FromSeconds(100),
+                    TimeSpan.FromSeconds(10)), 
+                logger);
+
+            await echoServer.Start();
         }
-
-        private static Task MyMessageHandler(EmptyContext context, RawMessage mesage)
+        private class ConsoleLogger<T> : ILogger<T>
         {
-            if(context.Owner is TcpSocketConnection< RawMessage, EchoProtocol, EmptyContext> connection)
+            public IDisposable BeginScope<TState>(TState state)
             {
-                if (mesage.Buffer.Length == 0)
-                {
-                    connection.Close();
-                }
-                Console.WriteLine($"From connection {connection.ID} : {mesage.Buffer.Length} bytes");
-                return connection.Send(mesage);
+                throw new NotImplementedException();
             }
-            return Task.CompletedTask;
+
+            public bool IsEnabled(LogLevel logLevel) => true;
+
+            public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter)
+            {
+                Console.WriteLine($"[{DateTime.Now}][{logLevel}] {state}");
+            }
         }
-    }
+      
+    }  
 }

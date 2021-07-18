@@ -1,4 +1,5 @@
 ﻿using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace BakaVaka.TcpServerLib
@@ -10,7 +11,7 @@ namespace BakaVaka.TcpServerLib
     /// <typeparam name="TClientContext">Дополнительная инофрмация о клиенте, в случае если для кодирования-декодирования она нужна</typeparam>
     public interface IProtocol<TMessage, TClientContext>
     {
-        public Task<TMessage> Decode(Stream inputStream, TClientContext context);
+        public Task<TMessage> Decode(Stream inputStream, TClientContext context, CancellationToken cancellationToken = default);
         public byte[] Encode(TMessage message, TClientContext clientContext);
     }
 }

@@ -7,6 +7,10 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BakaVaka.TcpServerLib", "sr
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "EchoServer", "src\EchoServer\EchoServer.csproj", "{72467F29-6EC3-40D4-92B0-BA983C28EA79}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Shared", "src\Shared\Shared.csproj", "{69EC2090-7A3C-4A98-98E5-1E38AA161FA7}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EchoClient", "src\EchoClient\EchoClient.csproj", "{0259E9B6-B48A-495F-A63F-22913A259BBE}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +25,14 @@ Global
 		{72467F29-6EC3-40D4-92B0-BA983C28EA79}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{72467F29-6EC3-40D4-92B0-BA983C28EA79}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{72467F29-6EC3-40D4-92B0-BA983C28EA79}.Release|Any CPU.Build.0 = Release|Any CPU
+		{69EC2090-7A3C-4A98-98E5-1E38AA161FA7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{69EC2090-7A3C-4A98-98E5-1E38AA161FA7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{69EC2090-7A3C-4A98-98E5-1E38AA161FA7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{69EC2090-7A3C-4A98-98E5-1E38AA161FA7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0259E9B6-B48A-495F-A63F-22913A259BBE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0259E9B6-B48A-495F-A63F-22913A259BBE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0259E9B6-B48A-495F-A63F-22913A259BBE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0259E9B6-B48A-495F-A63F-22913A259BBE}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
