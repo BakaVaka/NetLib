@@ -2,6 +2,7 @@
 {
     using Microsoft.Extensions.Logging;
     using System;
+    using System.Net;
     using System.Net.Sockets;
     using System.Threading;
     using System.Threading.Tasks;
@@ -11,39 +12,29 @@
     /// </summary>
     public class TcpServerBase : IServer
     {
-        public class ServerTimer : IServerTimer
+        internal class ServerTimer : IServerTimer
         {
             public DateTime ServerTime => DateTime.Now;
         }
 
         private readonly ServerSettings _settings;
         private readonly ILogger<TcpServerBase> _logger;
-        private readonly Func<IConnection> _connectionFactory;
-
-        private readonly Func<Socket> _acceptorFactory;
+        private readonly Func<Socket, IConnection> _connectionFactory;
         private readonly SemaphoreSlim _connectionLimiter;
         private readonly CancellationTokenSource _stopServerTokenSource = new();
         private readonly ConnectionManager _connectionManager;
         private readonly IServerTimer _serverTimer = new ServerTimer();
         public TcpServerBase(ServerSettings settings, 
             ILogger<TcpServerBase> logger,
-            Func<IConnection> connectionFactory
+            Func<Socket, IConnection> connectionFactory
             )
         {
 
             _settings = settings ?? throw new ArgumentNullException(nameof(settings));
             _logger = logger;
             _connectionFactory = connectionFactory;
-            _connectionLimiter = new SemaphoreSlim(_settings.MaxConnections, _settings.MaxConnections);
-            _acceptorFactory = () =>
-            {
-                Socket acceptor = new Socket(_settings.ListeningEndPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
-                acceptor.Bind(_settings.ListeningEndPoint);
-                acceptor.Listen();
-                return acceptor;
-            };
+            _connectionLimiter = new SemaphoreSlim(_settings.MaxConnections, _settings.MaxConnections);         
             _connectionManager = new(
-                _connectionFactory,
                 _serverTimer,
                 _settings.HeartbeatTimout,
                 _settings.DisconnectTimout,
@@ -57,7 +48,6 @@
             };
         }
 
-
         public Task Start()
         {
             return Run(_stopServerTokenSource.Token);
@@ -65,6 +55,10 @@
 
         public Task Stop()
         {
+            foreach(var connection in _connectionManager.Connections)
+            {
+                connection.Close();
+            }
             _stopServerTokenSource.Cancel();
             return Task.CompletedTask;
         }
@@ -72,7 +66,7 @@
         private async Task Run(CancellationToken stopToken)
         {
             Socket acceptor = null;
-            _logger.LogInformation("Server start accepting clients");
+            _logger.LogInformation("Server start running");
             try
             {
 
@@ -93,10 +87,10 @@
 
                     if(!stopToken.IsCancellationRequested)
                     {
-                        acceptor ??= _acceptorFactory();
+                        acceptor ??= CreateAcceptorSocket(_settings.ListeningEndPoint);
                         var clientSocket = await acceptor.AcceptAsync();
                         _logger.LogTrace("New client accepted");
-                        if(_connectionManager.Bind(clientSocket))
+                        if(_connectionManager.Bind(_connectionFactory(clientSocket)))
                         {
                             _logger.LogTrace("Client binded to server");
                         }
@@ -110,5 +104,12 @@
         }
 
         protected virtual void OnBinded(IConnection connection){}
+        private static Socket CreateAcceptorSocket(IPEndPoint listeningEndPoint)
+        {
+            Socket acceptor = new Socket(listeningEndPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+            acceptor.Bind(listeningEndPoint);
+            acceptor.Listen();
+            return acceptor;
+        }
     }
 }

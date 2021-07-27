@@ -11,7 +11,7 @@ namespace BakaVaka.TcpServerLib
     /// Отвечает за то чтобы следить за неактивными сессиями
     /// Предоставляет доступ к активным подключениям
     /// </summary>
-    public class ConnectionManager: IDisposable
+    internal class ConnectionManager: IDisposable
     {
         public event EventHandler ConnectionComplete;
 
@@ -19,7 +19,6 @@ namespace BakaVaka.TcpServerLib
         /// таймер для проверки статуса соединений
         /// </summary>
         private readonly Timer _heartbeater;
-        private readonly Func<IConnection> _connectionFactory;
         private readonly IServerTimer _serverTimer;
         private readonly TimeSpan _heartbeatInterval;
         private readonly TimeSpan _inactiveTimoutToClose;
@@ -32,7 +31,6 @@ namespace BakaVaka.TcpServerLib
 
 
         public ConnectionManager(
-            Func<IConnection> connectionFactory,
             IServerTimer serverTimer,
             TimeSpan heartbeatInterval, 
             TimeSpan inactiveTimoutToClose,
@@ -41,7 +39,6 @@ namespace BakaVaka.TcpServerLib
         {
             _heartbeater = new(Heartbeat);
             _heartbeatInterval = heartbeatInterval;
-            _connectionFactory = connectionFactory;
             _serverTimer = serverTimer;
             _inactiveTimoutToClose = inactiveTimoutToClose;
             _inactiveTimoutToIdle = inactiveTimoutToIdle;
@@ -50,21 +47,19 @@ namespace BakaVaka.TcpServerLib
 
         public IEnumerable<IConnection> Connections => _connectionsTable.Values;
 
-        public bool Bind(Socket clientSocket)
+        public bool Bind(IConnection connection)
         {
             ThrowIfDisposed();
-            var connection =  _connectionFactory();
             connection.Closed += (s,e) =>
             {
                 if(_connectionsTable.TryRemove(connection.Id, out var _))
                 {
-                    Console.WriteLine("Connection unbind");
                     ConnectionComplete?.Invoke(this, EventArgs.Empty);
                 }
             };
             if (_connectionsTable.TryAdd(connection.Id, connection))
             {
-                connection.BindSocket(clientSocket);
+                connection.Open();
                 return true;
             }
             return false;
@@ -83,19 +78,18 @@ namespace BakaVaka.TcpServerLib
                 var now = _serverTimer.ServerTime;
                 foreach(var(key, connection) in _connectionsTable)
                 {
+                    
                     var recent = connection.LastAcceptedMessageDateTime > connection.LastSentMessageDateTime
                         ? connection.LastSentMessageDateTime
                         : connection.LastAcceptedMessageDateTime;
 
-
-
-                    if (now - recent >= _inactiveTimoutToClose)
+                    //соединение открыто давно и при этом не получило ни одного сообщения за время неактивности
+                    if (now - recent >= _inactiveTimoutToClose && now - connection.Opened >= _inactiveTimoutToClose)
                     {
                         inactiveConnections.Add(connection);
                         continue;
-                    }                    
-
-                    if ( now - recent >= _inactiveTimoutToIdle)
+                    } 
+                    else if ( now - recent >= _inactiveTimoutToIdle)
                     {
                         idleConnctions.Add(connection);
                         continue;

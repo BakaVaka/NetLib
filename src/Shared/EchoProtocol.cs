@@ -6,9 +6,9 @@
     using System.Threading;
     using System.Threading.Tasks;
 
-    public class EchoProtocol : IProtocol<RawMessage, EmptyContext>
+    public class EchoProtocol : IProtocol<RawMessage>
     {
-        public async Task<RawMessage> Decode(Stream inputStream, EmptyContext context, CancellationToken cancellationToken)
+        public async Task<RawMessage> Decode(Stream inputStream, IConnection connection, CancellationToken cancellationToken)
         {
             var byteBuffer = new byte[1024];
             int len = await inputStream.ReadAsync(byteBuffer, cancellationToken);
@@ -22,7 +22,7 @@
             };
         }
 
-        public byte[] Encode(RawMessage message, EmptyContext clientContext)
+        public byte[] Encode(RawMessage message, IConnection connection)
         {
             return message.Buffer ?? Array.Empty<byte>();
         }

@@ -1,8 +1,12 @@
 ﻿namespace EchoClient
 {
     using BakaVaka.TcpServerLib;
+
     using Shared;
+
     using System;
+    using System.Collections.Generic;
+    using System.Linq;
     using System.Net.Sockets;
     using System.Text;
     using System.Threading;
@@ -12,39 +16,65 @@
     {
         static async Task Main()
         {
-            Socket clientSocket = new(SocketType.Stream, ProtocolType.Tcp);
-            clientSocket.Connect("localhost", 8080);
-            int sendCount = 10;
-            TcpSocketConnection<RawMessage, EchoProtocol, EmptyContext> connection = new();
-            connection.Closed += (s,e) =>
+            var range = Enumerable.Range(0, 100).Select(x => new Thread(async (_) => await DDOSS_Test()));
+            foreach (var t in range)
+                t.Start();
+            await Task.Delay(-1);
+        }
+        internal class EchoHandler : IMessageHandler<RawMessage, EchoProtocol>
+        {
+            private static readonly EchoHandler _instance = new();
+            private EchoHandler(){}
+            public static EchoHandler Instance => _instance;
+            public Task HandleMessage(RawMessage message, IConnection<RawMessage, EchoProtocol> connection)
             {
-                Console.WriteLine($"Connection closed");
+                return connection.Send(message);
+            }
+        }
 
-            };
-
-            connection.OnMessage(async (message) =>
+        public class EchoConnection : TcpSocketConnection<RawMessage, EchoProtocol>
+        {
+            public int SendCount { get; private set; } = 0;
+            public EchoConnection(Socket cleintSocket, IMessageHandler<RawMessage, EchoProtocol> messageHandler) : base(cleintSocket, messageHandler)
             {
+            }
+            public override Task Send(RawMessage message)
+            {
+                SendCount++;
+                return base.Send(message);
+            }
+        }
 
-                if(sendCount > 0)
+        private static async Task DDOSS_Test()
+        {
+            try
+            {
+                await Task.Delay(1);
+                Socket clientSocket = new(SocketType.Stream, ProtocolType.Tcp);
+                clientSocket.Connect("localhost", 8080);
+                var messageToSend = new RawMessage
                 {
-                    Interlocked.Decrement(ref sendCount);
-                    await connection.Send(message);
-                    return;
+                    Buffer = Encoding.ASCII.GetBytes("Hello\r\n")
+                };
+                EchoConnection connection = new(clientSocket, EchoHandler.Instance);
+                connection.Closed += (s, e) =>
+                {
+                    Console.WriteLine($"Connection closed");
+
+                };
+
+                connection.Open();
+                await connection.Send(messageToSend).ConfigureAwait(true);
+                while(connection.SendCount < 10 )
+                {
+                    await Task.Delay(1);
                 }
                 connection.Close();
-            });
-
-            connection.BindSocket(clientSocket);
-
-            await connection.Send(new RawMessage
-            {
-                Buffer = Encoding.ASCII.GetBytes("Hello")
-            });
-            while(sendCount>0)
-            {
-                await Task.Delay(-1);
             }
-            Console.WriteLine("Application complete");
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+            }
         }
     }
 }

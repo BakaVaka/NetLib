@@ -6,64 +6,61 @@
     using System.Threading;
     using System.Threading.Tasks;
 
-    public class TcpSocketConnection<TMessage, TProtocol, TContext> : 
-        IConnection<TMessage, TProtocol, TContext>
-        where TProtocol : IProtocol<TMessage, TContext>, new()
-        where TContext : IConnectionContext, new()
+    public class TcpSocketConnection<TMessage, TProtocol> :
+        IConnection<TMessage, TProtocol>
+        where TProtocol : IProtocol<TMessage>, new()
     {
 
         public event EventHandler Closed;
-
-        private Func<TMessage, Task> _messageCallback;
 
         private CancellationTokenSource _cancellationTokenSource = new();
         private bool _closed;
         private EndPoint _localEndPoint;
         private EndPoint _remoteEndPoint;
-
         private NetworkStream _networkStream;
         private TProtocol _protocl = new();
-        private TContext _context = new();
-
-        private readonly object _bindLocker = new();
-        private bool _binded;
+        private readonly IMessageHandler<TMessage, TProtocol> _messageHandler;
         private Task _connectionRunTask;
-
-        public void BindSocket(Socket socket)
+        
+        public TcpSocketConnection(Socket cleintSocket, IMessageHandler<TMessage, TProtocol> messageHandler)
         {
-            lock(_bindLocker)
-            {
-                if(_binded)
-                {
-                    throw new InvalidOperationException("Connection already binded to socket");
-                }
-                _localEndPoint = socket.LocalEndPoint;
-                _remoteEndPoint = socket.RemoteEndPoint;
-                _networkStream = new NetworkStream(socket, true);
-                _context.Bind(this);
-            }
-            _connectionRunTask = RunConnection();
+            
+            _localEndPoint = cleintSocket.LocalEndPoint;
+            _remoteEndPoint = cleintSocket.RemoteEndPoint;
+            _networkStream = new NetworkStream(cleintSocket, true);
+            _messageHandler = messageHandler;
+        }
+
+        public void Open()
+        {
+            Opened = DateTime.Now;
+            _connectionRunTask ??= RunConnection();
         }
 
         private async Task RunConnection()
-        {
+        {            
             try
             {
-                while(!_cancellationTokenSource.IsCancellationRequested)
+                while (!_cancellationTokenSource.IsCancellationRequested)
                 {
-
                     var message = await Receive(_cancellationTokenSource.Token);
-                    await _messageCallback.Invoke(message);
+                    await _messageHandler.HandleMessage(message,this);
                 }
             }
-            catch(Exception) { }
+            catch (Exception) { }
             Close();
+            
+            async Task<TMessage> Receive(CancellationToken cancellationToken)
+            {
+                ThrowIfDisposed();
+                var message = await _protocl.Decode(_networkStream, this, cancellationToken);
+                LastAcceptedMessageDateTime = DateTime.Now;
+                return message;
+            }
+
         }
 
-        public virtual void OnIdle(){}
-
-        public TContext Contex => _context;
-
+        public virtual void OnIdle() { }
         public EndPoint LocalEndPoint => _localEndPoint;
 
         public EndPoint RemoteEndPoint => _remoteEndPoint;
@@ -72,22 +69,14 @@
 
         public DateTime LastSentMessageDateTime { get; private set; }
         public Guid Id { get; } = Guid.NewGuid();
+        public DateTime Opened { get; private set;  }
 
-
-        private async Task<TMessage> Receive(CancellationToken cancellationToken)
+        public virtual async Task Send(TMessage message)
         {
             ThrowIfDisposed();
-            var message = await _protocl.Decode(_networkStream, Contex, cancellationToken);
-            LastAcceptedMessageDateTime = DateTime.Now;
-            return message;
-        }
-
-        public virtual async Task Send<T>(T message)
-        {
-            ThrowIfDisposed();
-            if(message is TMessage protocolMessage)
+            if (message is TMessage protocolMessage)
             {
-                var data = _protocl.Encode(protocolMessage, Contex);
+                var data = _protocl.Encode(protocolMessage, this);
                 await _networkStream.WriteAsync(data, _cancellationTokenSource.Token);
                 LastSentMessageDateTime = DateTime.Now;
             }
@@ -98,7 +87,7 @@
 
         private void ThrowIfDisposed()
         {
-            if(_disposed)
+            if (_disposed)
             {
                 throw new ObjectDisposedException($"Tcp connection {Id}");
             }
@@ -108,13 +97,11 @@
 
         private void Dispose(bool isDispose)
         {
-            if(!_disposed)
+            if (!_disposed)
             {
                 _disposed = true;
-                _cancellationTokenSource.Dispose();
                 _networkStream.Dispose();
-                _context.Dispose();
-                if(isDispose)
+                if (isDispose)
                 {
                     GC.SuppressFinalize(this);
                 }
@@ -123,18 +110,13 @@
 
         public void Close()
         {
-            if(!_closed)
+            if (!_closed)
             {
                 _closed = true;
                 _cancellationTokenSource.Cancel();
                 _networkStream.Close();
                 Closed?.Invoke(this, EventArgs.Empty);
             }
-        }
-
-        public void OnMessage(Func<TMessage, Task> onMessageCallback)
-        {
-            _messageCallback = onMessageCallback;
         }
     }
 }

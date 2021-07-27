@@ -2,24 +2,17 @@
 {
     using Microsoft.Extensions.Logging;
     using System;
+    using System.Net.Sockets;
 
-    public abstract class TcpServer<TMessage, TProtocol, TContext>
+    public abstract class TcpServer<TMessage, TProtocol>
         : TcpServerBase
-        where TProtocol : IProtocol<TMessage, TContext>
-        where TContext : IConnectionContext, new()
+        where TProtocol : IProtocol<TMessage>
     {
         public TcpServer(
                 ServerSettings settings, 
                 ILogger<TcpServerBase> logger,
-                IMessageDispatcher<TMessage, TContext> messageDispatcher,
-                Func<IConnection<TMessage, TProtocol, TContext>> connectionFactory
-            ) : base(settings, logger, 
-                () => 
-                { 
-                    var connection = connectionFactory();
-                    messageDispatcher.Bind(connection);
-                    return connection;
-                })
+                Func<Socket, IConnection<TMessage, TProtocol>> connectionFactory
+            ) : base(settings, logger, connectionFactory)
         {}
     }
 }

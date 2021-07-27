@@ -5,13 +5,11 @@ using System.Threading.Tasks;
 namespace BakaVaka.TcpServerLib
 {
     /// <summary>
-    /// Абстрактный протокол
+    /// Абстрактный протокол, например HTTP, IRC, SNMP, etc
     /// </summary>
-    /// <typeparam name="TMessage">Тип сообщений(http, irc, etc)</typeparam>
-    /// <typeparam name="TClientContext">Дополнительная инофрмация о клиенте, в случае если для кодирования-декодирования она нужна</typeparam>
-    public interface IProtocol<TMessage, TClientContext>
+    public interface IProtocol<TMessage>
     {
-        public Task<TMessage> Decode(Stream inputStream, TClientContext context, CancellationToken cancellationToken = default);
-        public byte[] Encode(TMessage message, TClientContext clientContext);
+        public Task<TMessage> Decode(Stream inputStream, IConnection connection, CancellationToken cancellationToken = default);
+        public byte[] Encode(TMessage message, IConnection connection);
     }
 }

@@ -7,31 +7,31 @@
     using System.Net;
     using System.Threading.Tasks;
 
-    public class MyEchoServer : TcpServer<RawMessage, EchoProtocol, EmptyContext>
+    public class MyEchoServer : TcpServer<RawMessage, EchoProtocol>
     {
         public MyEchoServer(
-            ServerSettings settings, 
+            ServerSettings settings,
             ILogger<MyEchoServer> logger)
-            : base(settings, 
+            : base(settings,
                   logger,
-                  new EmptyDispatcher(),
-                  () => new TcpSocketConnection<RawMessage, EchoProtocol, EmptyContext>())
+                  (socket) => new TcpSocketConnection<RawMessage, EchoProtocol>(socket, EchoHandler.Instance))
         {
         }
 
     }
 
-    public class EmptyDispatcher : MessageDispatcherBase<RawMessage, EmptyContext>
+    public class EchoHandler : IMessageHandler<RawMessage, EchoProtocol>
     {
-        protected override Task Dispatch<TProtocol>(
-            RawMessage message, 
-            IConnection<RawMessage, TProtocol, EmptyContext> connection, 
-            EmptyContext contex)
+        private static EchoHandler _instance = new();
+        public static EchoHandler Instance => _instance;
+        public ILogger Logger { get; set; }
+        private EchoHandler() { }
+        public Task HandleMessage(RawMessage message, IConnection<RawMessage, EchoProtocol> connection)
         {
-            Console.WriteLine("Message accepted");
+            Logger?.LogTrace($"Message received. Len: {message.Buffer.Length}");
             return connection.Send(message);
         }
-    }   
+    }
 
     class Program
     {
@@ -39,13 +39,13 @@
         {
 
             ILogger<MyEchoServer> logger = new ConsoleLogger<MyEchoServer>();
-
+            EchoHandler.Instance.Logger = logger;
             var echoServer = new MyEchoServer
                 (new ServerSettings
-                (new IPEndPoint(0, 8080), 1000000,
+                (new IPEndPoint(0, 8080), 10000000,
                     TimeSpan.FromSeconds(10),
                     TimeSpan.FromSeconds(100),
-                    TimeSpan.FromSeconds(10)), 
+                    TimeSpan.FromSeconds(10)),
                 logger);
 
             await echoServer.Start();
@@ -64,6 +64,6 @@
                 Console.WriteLine($"[{DateTime.Now}][{logLevel}] {state}");
             }
         }
-      
-    }  
+
+    }
 }
