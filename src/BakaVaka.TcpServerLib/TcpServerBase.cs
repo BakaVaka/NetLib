@@ -36,9 +36,9 @@
             _connectionLimiter = new SemaphoreSlim(_settings.MaxConnections, _settings.MaxConnections);         
             _connectionManager = new(
                 _serverTimer,
-                _settings.HeartbeatTimout,
-                _settings.DisconnectTimout,
-                _settings.IdleTimout
+                _settings.HeartbeatTimeout,
+                _settings.DisconnectTimeout,
+                _settings.IdleTimeout
             );
 
             _connectionManager.ConnectionComplete += (_, _) =>
@@ -48,7 +48,7 @@
             };
         }
 
-        public Task Start()
+        public Task Run()
         {
             return Run(_stopServerTokenSource.Token);
         }

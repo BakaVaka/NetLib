@@ -1,12 +1,15 @@
-﻿namespace EchoServer
-{
-    using BakaVaka.TcpServerLib;
-    using Microsoft.Extensions.Logging;
-    using Shared;
-    using System;
-    using System.Net;
-    using System.Threading.Tasks;
+﻿using BakaVaka.TcpServerLib;
 
+using Microsoft.Extensions.Logging;
+
+using Shared;
+
+using System;
+using System.Net;
+using System.Threading.Tasks;
+
+namespace EchoServer
+{
     public class MyEchoServer : TcpServer<RawMessage, EchoProtocol>
     {
         public MyEchoServer(
@@ -39,16 +42,19 @@
         {
 
             ILogger<MyEchoServer> logger = new ConsoleLogger<MyEchoServer>();
-            EchoHandler.Instance.Logger = logger;
-            var echoServer = new MyEchoServer
-                (new ServerSettings
-                (new IPEndPoint(0, 8080), 10000000,
-                    TimeSpan.FromSeconds(10),
-                    TimeSpan.FromSeconds(100),
-                    TimeSpan.FromSeconds(10)),
-                logger);
+            var settings = new ServerSettings(
+                ListeningEndPoint: new IPEndPoint(0, 8080),
+                MaxConnections: int.MaxValue,
+                DisconnectTimeout: TimeSpan.FromSeconds(120),
+                HeartbeatTimeout: TimeSpan.FromSeconds(1),
+                IdleTimeout: TimeSpan.FromSeconds(10));
 
-            await echoServer.Start();
+            EchoHandler.Instance.Logger = logger;
+            var echoServer = new MyEchoServer(settings, logger);
+            var run = echoServer.Run();
+            while(Console.ReadKey().Key != ConsoleKey.Escape) { }
+            echoServer.Stop();
+            await run;
         }
         private class ConsoleLogger<T> : ILogger<T>
         {

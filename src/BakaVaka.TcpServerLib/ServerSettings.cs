@@ -6,7 +6,7 @@
     public record ServerSettings(
         IPEndPoint ListeningEndPoint,
         int MaxConnections,
-        TimeSpan HeartbeatTimout,
-        TimeSpan DisconnectTimout,
-        TimeSpan IdleTimout);
+        TimeSpan HeartbeatTimeout,
+        TimeSpan DisconnectTimeout,
+        TimeSpan IdleTimeout);
 }

@@ -3,7 +3,7 @@
     using System.Threading.Tasks;
     public interface IServer
     {
-        public Task Start();
+        public Task Run();
         public Task Stop();
     }
 }
