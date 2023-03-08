@@ -1,8 +1,9 @@
-﻿namespace BakaVaka.TcpServerLib
+﻿using System.Net;
+
+namespace BakaVaka.TcpServerLib
 {
     public interface IConnectionAcceptorFactory
     {
-        public IConnectionAcceptor Create(ServerSettings settings);
-
+        public IAcceptor Create(EndPoint endPoint);
     }
 }

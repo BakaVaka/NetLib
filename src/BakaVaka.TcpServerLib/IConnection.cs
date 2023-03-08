@@ -1,16 +1,15 @@
 ﻿using System;
+using System.Net;
 
-namespace BakaVaka.TcpServerLib
+namespace BakaVaka.TcpServerLib;
+
+public interface IConnection : IDisposable
 {
-    public interface IConnection : IDisposable
-    {
-        public Guid Id { get; }
-        public event EventHandler Closed;
-        public DateTime LastAcceptedMessageDateTime { get; }
-        public DateTime LastSentMessageDateTime { get; }
-        public DateTime Opened { get; }
-        public void OnIdle();
-        public void Open();
-        public void Close();
-    }
+    public Guid Id { get; }
+    public DateTimeOffset? OpenedAt { get; }
+    public EndPoint? LocalEndPoint { get; }
+    public EndPoint? RemoteEndPoint { get; }
+    public void Start();
+    public void Abort(Exception reason = null);
+    ITransport Transport { get; }
 }

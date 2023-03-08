@@ -1,23 +1,23 @@
-﻿using BakaVaka.TcpServerLib;
+﻿using System;
+using System.Net;
+using System.Threading.Tasks;
+
+using BakaVaka.TcpServerLib;
 
 using Microsoft.Extensions.Logging;
 
 using Shared;
 
-using System;
-using System.Net;
-using System.Threading.Tasks;
-
 namespace EchoServer
 {
-    public class MyEchoServer : TcpServer<RawMessage, EchoProtocol>
+    public class MyEchoServer : TcpServer
     {
         public MyEchoServer(
             ServerSettings settings,
             ILogger<MyEchoServer> logger)
             : base(settings,
                   logger,
-                  (socket) => new TcpSocketConnection<RawMessage, EchoProtocol>(socket, EchoHandler.Instance))
+                  (socket) => new TcpSocketConnection(socket))
         {
         }
 
@@ -52,7 +52,7 @@ namespace EchoServer
             EchoHandler.Instance.Logger = logger;
             var echoServer = new MyEchoServer(settings, logger);
             var run = echoServer.Run();
-            while(Console.ReadKey().Key != ConsoleKey.Escape) { }
+            while (Console.ReadKey().Key != ConsoleKey.Escape) { }
             echoServer.Stop();
             await run;
         }

@@ -4,7 +4,7 @@
     using System.Net;
 
     public record ServerSettings(
-        IPEndPoint ListeningEndPoint,
+        IPEndPoint[] ListeningEndPoint,
         int MaxConnections,
         TimeSpan HeartbeatTimeout,
         TimeSpan DisconnectTimeout,

@@ -1,16 +1,15 @@
 ﻿namespace EchoClient
 {
-    using BakaVaka.TcpServerLib;
-
-    using Shared;
-
     using System;
-    using System.Collections.Generic;
     using System.Linq;
     using System.Net.Sockets;
     using System.Text;
     using System.Threading;
     using System.Threading.Tasks;
+
+    using BakaVaka.TcpServerLib;
+
+    using Shared;
 
     class Program
     {
@@ -21,12 +20,12 @@
                 t.Start();
             await Task.Delay(-1);
         }
-        internal class EchoHandler : IMessageHandler<RawMessage, EchoProtocol>
+        internal class EchoHandler : IMessageHandler<RawMessage>
         {
             private static readonly EchoHandler _instance = new();
-            private EchoHandler(){}
+            private EchoHandler() { }
             public static EchoHandler Instance => _instance;
-            public Task HandleMessage(RawMessage message, IConnection<RawMessage, EchoProtocol> connection)
+            public Task HandleMessage(RawMessage message, IConnection connection, CancellationToken cancellationToken)
             {
                 return connection.Send(message);
             }
@@ -65,7 +64,7 @@
 
                 connection.Open();
                 await connection.Send(messageToSend).ConfigureAwait(true);
-                while(connection.SendCount < 10 )
+                while (connection.SendCount < 10)
                 {
                     await Task.Delay(1);
                 }

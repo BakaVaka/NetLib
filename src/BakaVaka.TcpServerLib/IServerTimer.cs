@@ -2,8 +2,9 @@
 
 namespace BakaVaka.TcpServerLib
 {
-    public interface IServerTimer
+    public interface IClock
     {
-        public DateTime ServerTime { get; }
+        public DateTimeOffset Now { get; }
+        public DateTimeOffset NowUTC { get; }
     }
 }
