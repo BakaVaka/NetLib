@@ -1,4 +1,6 @@
-﻿namespace BakaVaka.TcpServerLib;
+﻿using BakaVaka.NetLib.Abstractions;
+
+namespace BakaVaka.TcpServerLib;
 /// <summary>
 /// Класс реализующий "удар сердца" сервера
 /// Т.е. раз в некоторый интервал времени - выполняет над соединениями какую-то логику.

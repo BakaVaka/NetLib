@@ -10,11 +10,4 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Logging" Version="5.0.0" />
   </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\BakaVaka.TcpLib.Shared\BakaVaka.TcpLib.Shared.csproj" />
-    <ProjectReference Include="..\BakaVaka.TcpServerLib\BakaVaka.TcpServerLib.csproj" />
-    <ProjectReference Include="..\Shared\Shared.csproj" />
-  </ItemGroup>
-
 </Project>

@@ -1,2 +1,3 @@
 ﻿namespace BakaVaka.NetLib.Server;
-public class ServerBuilder {}
+public class ServerBuilder {
+}
