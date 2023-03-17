@@ -1,14 +1,35 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Net;
+using System.Net.Sockets;
+
+using BakaVaka.NetLib.Abstractions;
 
 namespace BakaVaka.TcpServerLib;
-public class TcpSocketAccpetor : IAcceptor
-{
-    public Task<IConnection> Accept()
-    {
-        throw new NotImplementedException();
+
+/// <summary>
+/// Простой слушатель TCP подключений
+/// Принимает соедниения, оборачивает в IConnection
+/// </summary>
+public class TcpSocketAccpetor : IListener {
+    private Socket? _socket;
+    public TcpSocketAccpetor(IPEndPoint endPoint) {
+        BindedEndPoint = endPoint;
+    }
+    public EndPoint BindedEndPoint { get; }
+    public bool IsBinded => _socket != null;
+    public async ValueTask<IConnection> AcceptAsync(CancellationToken cancellationToken = default) {
+        var clientSocket = await _socket.AcceptAsync(cancellationToken);
+        var connection = new TcpSocketConnection(clientSocket);
+        return connection;
+    }
+
+    public void Bind() {
+        _socket = new Socket(SocketType.Stream, ProtocolType.Tcp);
+        _socket.Bind(BindedEndPoint);
+        _socket.Listen();
+    }
+
+    public void Unbind() {
+        _socket.Dispose();
+        _socket = null;
     }
 }
