@@ -16,5 +16,4 @@ public class ProtocolContext<TProtocol, TMessage, TContext>
     public async Task Send(TMessage message, CancellationToken cancellationToken = default) {
         await _protocol.Send(Connection.Transport.Out, message, (TContext)this, cancellationToken);
     }
-
 }

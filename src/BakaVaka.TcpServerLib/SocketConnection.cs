@@ -3,10 +3,11 @@ using System.Net;
 using System.Net.Sockets;
 
 using BakaVaka.NetLib.Abstractions;
+using BakaVaka.NetLib.Shared;
 
 namespace BakaVaka.TcpServerLib;
 
-public class TcpSocketConnection : IConnection {
+public class SocketConnection : IConnection {
 
     private CancellationTokenSource _cancellationTokenSource = new();
     private bool _closed;
@@ -14,12 +15,12 @@ public class TcpSocketConnection : IConnection {
     private Exception? _closeReason;
     private Task? _connectionRunTask;
     private readonly ITransportPair _transportPair;
-    private readonly SocketReceiver _receiver;
-    private readonly TcpSocketConnectionSender _sender;
+    private readonly SocketConnectionReceiver _receiver;
+    private readonly SocketConnectionSender _sender;
     private bool _disposed;
 
     private Task _runTask;
-    public TcpSocketConnection(Socket clientSocket) {
+    public SocketConnection(Socket clientSocket) {
         Items = new ItemStore();
         Features = new FeatureCollection();
 
@@ -27,8 +28,8 @@ public class TcpSocketConnection : IConnection {
         RemoteEndPoint = clientSocket.RemoteEndPoint;
         _clientSocket = clientSocket;
         _transportPair = new DefaultTransportPair(new Pipe(), new Pipe());
-        _receiver = new SocketReceiver(_clientSocket, _transportPair.In.Out);
-        _sender = new TcpSocketConnectionSender(_clientSocket, _transportPair.Out.In);
+        _receiver = new SocketConnectionReceiver(_clientSocket, _transportPair.In.Out);
+        _sender = new SocketConnectionSender(_clientSocket, _transportPair.Out.In);
         Transport = _transportPair.In;
 
     }
@@ -37,8 +38,8 @@ public class TcpSocketConnection : IConnection {
     public ITransport Transport { get; internal set; }
     public Guid Id { get; }
     public DateTimeOffset? StartedAt { get; }
-    public ItemStore Items { get; }
-    public FeatureCollection Features { get; }
+    public IItemStore Items { get; }
+    public IFeatureCollection Features { get; }
 
     public void Start() {
         var receiveTask = _receiver.Receive(_cancellationTokenSource.Token);
@@ -60,7 +61,7 @@ public class TcpSocketConnection : IConnection {
             throw new ObjectDisposedException($"Tcp connection {Id}");
         }
     }
-    ~TcpSocketConnection() => Dispose(false);
+    ~SocketConnection() => Dispose(false);
     public void Dispose() => Dispose(true);
 
     private void Dispose(bool isDispose) {

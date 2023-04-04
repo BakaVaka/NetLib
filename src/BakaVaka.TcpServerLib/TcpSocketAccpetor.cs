@@ -18,7 +18,7 @@ public class TcpSocketAccpetor : IListener {
     public bool IsBinded => _socket != null;
     public async ValueTask<IConnection> AcceptAsync(CancellationToken cancellationToken = default) {
         var clientSocket = await _socket.AcceptAsync(cancellationToken);
-        var connection = new TcpSocketConnection(clientSocket);
+        var connection = new SocketConnection(clientSocket);
         return connection;
     }
 
@@ -26,6 +26,21 @@ public class TcpSocketAccpetor : IListener {
         _socket = new Socket(SocketType.Stream, ProtocolType.Tcp);
         _socket.Bind(BindedEndPoint);
         _socket.Listen();
+    }
+
+    public async Task Run(ConnectionHandler connectionHandler, CancellationToken cancellationToken) {
+        while( !cancellationToken.IsCancellationRequested ) {
+            try {
+                var client = await _socket.AcceptAsync(cancellationToken);
+                if(client is not null ) {
+                    var 
+                }
+            }
+            catch( Exception ) {
+
+            }
+        }
+    
     }
 
     public void Unbind() {

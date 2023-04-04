@@ -30,12 +30,7 @@ public class TcpServer : IServer {
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
         _logger = logger;
         _connectionFactory = connectionFactory;
-        _connectionManager = new(
-            _serverTimer,
-            _settings.HeartbeatTimeout,
-            _settings.DisconnectTimeout,
-            _settings.IdleTimeout
-        );
+        _connectionManager = new(new DefaultClock, TimeSpan.FromSeconds(1), _settings.DisconnectionTimout, _settings.IdleTimout);
     }
 
     public Task Run() {
