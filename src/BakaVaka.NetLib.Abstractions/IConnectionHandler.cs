@@ -1,8 +1,4 @@
-using BakaVaka.NetLib.Abstractions;
-using BakaVaka.TcpServerLib.Events;
-
-namespace BakaVaka.TcpServerLib;
+namespace BakaVaka.NetLib.Abstractions;
 public interface IConnectionHandler {
-    public event EventHandler<ConnectionClosedEventArgs> ConnectionClosed;
     public Task Handle(IConnection connection, CancellationToken cancellationToken = default);
 }

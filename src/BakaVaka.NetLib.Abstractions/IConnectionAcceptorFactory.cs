@@ -1,8 +1,6 @@
 ﻿using System.Net;
 
-using BakaVaka.NetLib.Abstractions;
-
-namespace BakaVaka.TcpServerLib;
+namespace BakaVaka.NetLib.Abstractions;
 
 public interface IConnectionAcceptorFactory {
     public IListener Create(EndPoint endPoint);

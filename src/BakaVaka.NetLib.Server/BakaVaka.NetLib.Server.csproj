@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\BakaVaka.NetLib.Abstractions\BakaVaka.NetLib.Abstractions.csproj" />
+    <ProjectReference Include="..\BakaVaka.NetLib.Sockets\BakaVaka.NetLib.Sockets.csproj" />
   </ItemGroup>
 
 </Project>

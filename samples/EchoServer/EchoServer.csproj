@@ -12,6 +12,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\BakaVaka.NetLib.Server\BakaVaka.NetLib.Server.csproj" />
     <ProjectReference Include="..\..\src\BakaVaka.NetLib.Shared\BakaVaka.NetLib.Shared.csproj" />
   </ItemGroup>
 </Project>

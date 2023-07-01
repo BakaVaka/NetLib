@@ -1,15 +1,10 @@
-﻿namespace Shared;
-
-using System;
-using System.Buffers;
-using System.IO;
+﻿using System.Buffers;
 using System.IO.Pipelines;
-using System.Threading;
-using System.Threading.Tasks;
 
 using BakaVaka.NetLib.Abstractions;
 
-public class EchoProtocol : IProtocol<RawMessage> {
+namespace Shared;
+public class EchoProtocol : ICodec<RawMessage> {
     public async Task<RawMessage> Decode(Stream inputStream, IConnection connection, CancellationToken cancellationToken) {
         var byteBuffer = new byte[1024];
         int len = await inputStream.ReadAsync(byteBuffer, cancellationToken);
@@ -24,7 +19,7 @@ public class EchoProtocol : IProtocol<RawMessage> {
         return message.Buffer ?? Array.Empty<byte>();
     }
 
-    public async ValueTask<RawMessage> Receive(PipeReader reader, CancellationToken cancellationToken = default) {
+    public async ValueTask<RawMessage> Decode(PipeReader reader, CancellationToken cancellationToken = default) {
         var readResult = await reader.ReadAsync(cancellationToken);
         var message = readResult.Buffer.ToArray();
         reader.AdvanceTo(readResult.Buffer.End, readResult.Buffer.End);
@@ -32,7 +27,7 @@ public class EchoProtocol : IProtocol<RawMessage> {
         return new RawMessage() { Buffer = message };
     }
 
-    public async ValueTask Send(PipeWriter writer, RawMessage message, CancellationToken cancellationToken = default) {
+    public async ValueTask Encode(PipeWriter writer, RawMessage message, CancellationToken cancellationToken = default) {
         await writer.WriteAsync(message.Buffer, cancellationToken); ;
     }
 }

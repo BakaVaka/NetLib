@@ -5,10 +5,10 @@ using System.Xml;
 using BakaVaka.NetLib.Abstractions;
 
 namespace Shared;
-internal class SimpleXMLProtocol : IProtocol<SimpleXMLProtocolMessage> {
+internal class SimpleXMLProtocol : ICodec<SimpleXMLProtocolMessage> {
     private const int _headerLenght = sizeof(long);
     private const ulong _maxMessageSize = 1024 * 10;
-    public ValueTask<SimpleXMLProtocolMessage> Receive(PipeReader reader, CancellationToken cancellationToken = default) {
+    public ValueTask<SimpleXMLProtocolMessage> Decode(PipeReader reader, CancellationToken cancellationToken = default) {
         var stream = reader.AsStream();
         var memoryStream = new BinaryReader(stream);
 
@@ -23,7 +23,7 @@ internal class SimpleXMLProtocol : IProtocol<SimpleXMLProtocolMessage> {
         return ValueTask.FromResult(message);
     }
 
-    public ValueTask Send(PipeWriter writer, SimpleXMLProtocolMessage message, CancellationToken cancellationToken = default) {
+    public ValueTask Encode(PipeWriter writer, SimpleXMLProtocolMessage message, CancellationToken cancellationToken = default) {
         throw new NotImplementedException();
     }
 }

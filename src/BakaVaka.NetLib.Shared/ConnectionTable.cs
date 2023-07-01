@@ -11,7 +11,7 @@ internal class ConnectionsStore {
             if( @ref.TryGetTarget(out connection) ) {
                 return true;
             }
-            //celan, cause connection is lost now(((
+            // чистим
             _connections.TryRemove(id, out _);
         }
         return false;

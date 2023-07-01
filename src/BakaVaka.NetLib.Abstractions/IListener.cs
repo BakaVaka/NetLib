@@ -8,10 +8,12 @@ public delegate Task ConnectionHandler(IConnection connection, CancellationToken
 /// Представляет из себя слушателя входящих подключений
 /// </summary>
 public interface IListener {
+    public event Action<IConnection> ConnectionAccepted;
     public EndPoint BindedEndPoint { get; }
+
     public void Bind();
     public void Unbind();
-    public Task Run(ConnectionHandler connectionHandler, CancellationToken cancellationToken);
+    public Task Run(CancellationToken cancellationToken = default);
 }
 
 public interface IListenerFactory {

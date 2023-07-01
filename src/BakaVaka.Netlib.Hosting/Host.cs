@@ -1,12 +1,9 @@
-﻿using BakaVaka.TcpServerLib;
-
-namespace BakaVaka.NetlLib.Hosting;
+﻿namespace BakaVaka.NetlLib.Hosting;
 /// <summary>
 /// Хост сервера
 /// </summary>
 public class Host {
     private IServiceProvider _serviceProvider;
-    private readonly Heartbeat _heartbeat;
     private int _started = new();
 
     public Task StartAsync(CancellationToken cancellationToken = default) {

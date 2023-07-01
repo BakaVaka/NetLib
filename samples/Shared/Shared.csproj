@@ -5,4 +5,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\BakaVaka.NetLib.Abstractions\BakaVaka.NetLib.Abstractions.csproj" />
+  </ItemGroup>
 </Project>

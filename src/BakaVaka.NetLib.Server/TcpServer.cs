@@ -1,92 +1,96 @@
 ﻿using System.Net;
-using System.Net.Sockets;
 
 using BakaVaka.NetLib.Abstractions;
+using BakaVaka.TcpServerLib;
+using BakaVaka.TcpServerLib.Features;
 
-using Microsoft.Extensions.Logging;
-
-namespace BakaVaka.TcpServerLib;
+namespace BakaVaka.NetLib.Server;
 
 /// <summary>
 /// Базовая логика сервера
 /// </summary>
 public class TcpServer : IServer {
-    internal sealed class DefaultClock : IClock {
-        public DateTimeOffset Now => DateTimeOffset.Now;
-        public DateTimeOffset NowUTC => DateTimeOffset.UtcNow;
-    }
+
+    const int SERVER_WAITING_FOR_START = 0;
+    const int SERVER_STARTING = 1;
+    const int SERVER_RUN = 2;
+    const int SERVER_STOPING = 3;
+
 
     private readonly TcpServerSettings _settings;
-    private readonly ILogger<TcpServer> _logger;
-    private readonly Func<Socket, IConnection> _connectionFactory;
-    private readonly CancellationTokenSource _stopServerTokenSource = new();
-    private readonly ConnectionManager _connectionManager;
-    private readonly IClock _serverTimer = new DefaultClock();
-    public TcpServer(TcpServerSettings settings,
-        ILogger<TcpServer> logger,
-        Func<Socket, IConnection> connectionFactory
-        ) {
-
-        _settings = settings ?? throw new ArgumentNullException(nameof(settings));
-        _logger = logger;
-        _connectionFactory = connectionFactory;
-        _connectionManager = new(new DefaultClock, TimeSpan.FromSeconds(1), _settings.DisconnectionTimout, _settings.IdleTimout);
+    private readonly ConnectionHandler _handler;
+    private readonly Heartbeat _heartbeat;
+    private List<IListener> _listeners = new();
+    private int _serverState;
+    public TcpServer(TcpServerSettings settings, ConnectionHandler handler) {
+        _settings = settings;
+        _handler = handler;
+        _heartbeat = new Heartbeat(settings.Clock, new Heartbeat.HeartbeatSettings() { HeartbeatInterval = TimeSpan.FromSeconds(1) });
     }
-
-    public Task Run() {
-        return Run(_stopServerTokenSource.Token);
-    }
-
-    public Task Stop() {
-        foreach( var connection in _connectionManager.Connections ) {
-            connection.Abort();
+    public async Task StartAsync(CancellationToken cancellationToken = default) {
+        
+        if(Interlocked.CompareExchange(ref _serverState, SERVER_STARTING, SERVER_WAITING_FOR_START) != SERVER_WAITING_FOR_START ) {
+            throw new Exception("Invalid state");
         }
-        _stopServerTokenSource.Cancel();
-        return Task.CompletedTask;
+        ValidateSettings(_settings);
+
+        _listeners = _settings.Listen
+            .Select(x => (IListener)new SocketAccpetor(new IPEndPoint(IPAddress.IPv6Any, x)))
+            .ToList();
+
+        foreach(var listener in _listeners) {
+            listener.Bind();
+            listener.ConnectionAccepted += OnConnectionAccepted;
+            listener.Run();
+        }
+        _heartbeat.Start();
     }
 
-    private async Task Run(CancellationToken stopToken) {
-        Socket acceptor = null;
-        _logger.LogInformation("Server start running");
+    
+    public async Task StopAsync(CancellationToken cancellationToken = default) {
+        if(Interlocked.CompareExchange(ref _serverState, SERVER_STOPING, SERVER_RUN) != SERVER_RUN ) {
+            throw new Exception("Invalid state");
+        }
+        _heartbeat.Stop();
+        foreach(var listeners in _listeners) {
+            listeners.Unbind();
+        }
+
+        _serverState = SERVER_WAITING_FOR_START;
+    }
+    private void ValidateSettings(TcpServerSettings settings) {
+        if(settings.Listen.Length == 0 ) {
+            throw new ArgumentException("At least 1 port required for start server");
+        }
+
+        if(settings.IdleTimout > settings.DisconnectionTimout ) {
+            throw new ArgumentException("Invalid timeout settings");
+        }
+
+        //todo other checks
+    }
+
+    private async void OnConnectionAccepted(IConnection connection) {
+
+
+        if( connection.Features.HasFeatuer<IHeartbeatFeature>() ) {
+            var heartBeatFeature = connection.Features.Get<IHeartbeatFeature>();
+            _heartbeat.Tick += (time) => heartBeatFeature.OnHeartbeat(time);
+        }
+
+        connection.Start();
+
         try {
-
-            while( !stopToken.IsCancellationRequested ) {
-                //если не смогли получить семафор в течении секунды
-                //убьем серверный сокет и будем ждать, пока кто-нибудь не отвалится
-                var canAccept = await _connectionLimiter.WaitAsync(1000, stopToken);
-                if( !canAccept ) {
-                    _logger.LogWarning("Maximum connection reached. Stop accepting clients");
-                    acceptor?.Close();
-                    acceptor?.Dispose();
-                    acceptor = null;
-
-                    await _connectionLimiter.WaitAsync(stopToken);
-                }
-
-                if( !stopToken.IsCancellationRequested ) {
-                    //todo исправить
-                    acceptor ??= CreateAcceptorSocket(_settings.ListeningEndPoint[0]);
-                    var clientSocket = await acceptor.AcceptAsync();
-                    _logger.LogTrace("New client accepted");
-                    var connection = _connectionFactory(clientSocket);
-                    if( _connectionManager.Bind(connection) ) {
-                        _logger.LogTrace("Client binded to server");
-                        OnBinded(connection);
-                    }
-                }
-            }
-
+            await _handler(connection);
         }
-        catch( OperationCanceledException ) { }
-        catch( Exception ex ) { _logger.LogError($"Unexpected exception {ex}"); }
-        _logger.LogInformation("Server complete running");
+        catch( Exception ) { }
+
+
+        if( connection.Features.HasFeatuer<IHeartbeatFeature>() ) {
+            var heartBeatFeature = connection.Features.Get<IHeartbeatFeature>();
+            _heartbeat.Tick -= (time) => heartBeatFeature.OnHeartbeat(time);
+        }
+
     }
 
-    protected virtual void OnBinded(IConnection connection) { }
-    private static Socket CreateAcceptorSocket(IPEndPoint listeningEndPoint) {
-        Socket acceptor = new Socket(listeningEndPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
-        acceptor.Bind(listeningEndPoint);
-        acceptor.Listen();
-        return acceptor;
-    }
 }

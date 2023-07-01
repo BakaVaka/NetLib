@@ -1,7 +1,9 @@
-﻿namespace BakaVaka.TcpServerLib;
+﻿using BakaVaka.NetLib.Abstractions;
 
-internal sealed class ServerContext {
-    public ServerContext(IClock clock, TcpServerSettings serverSettings, IServiceProvider serviceProvider) {
+namespace BakaVaka.NetLib.Server;
+
+internal sealed class TcpServerContext {
+    public TcpServerContext(IClock clock, TcpServerSettings serverSettings, IServiceProvider serviceProvider) {
         Clock = clock;
         ServerSettings = serverSettings;
         ServiceProvider = serviceProvider;

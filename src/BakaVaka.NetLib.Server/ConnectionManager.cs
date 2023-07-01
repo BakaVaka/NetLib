@@ -2,7 +2,7 @@
 
 using BakaVaka.NetLib.Abstractions;
 
-namespace BakaVaka.TcpServerLib;
+namespace BakaVaka.NetLib.Server;
 
 /// <summary>
 /// Отвечает за то чтобы следить за неактивными сессиями
@@ -60,7 +60,6 @@ internal class ConnectionManager : IDisposable {
     private void Dispose(bool isDispose) {
         if( _disposed ) {
             _disposed = true;
-            _heartbeater.Dispose();
             if( isDispose ) {
                 GC.SuppressFinalize(this);
             }

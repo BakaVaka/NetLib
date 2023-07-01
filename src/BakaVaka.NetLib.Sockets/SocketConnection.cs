@@ -36,7 +36,7 @@ public class SocketConnection : IConnection {
     public EndPoint LocalEndPoint { get; }
     public EndPoint RemoteEndPoint { get; }
     public ITransport Transport { get; internal set; }
-    public Guid Id { get; }
+    public Guid Id { get; } = Guid.NewGuid();
     public DateTimeOffset? StartedAt { get; }
     public IItemStore Items { get; }
     public IFeatureCollection Features { get; }
